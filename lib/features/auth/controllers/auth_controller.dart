@@ -27,14 +27,26 @@ class AuthController extends ChangeNotifier {
   void _listen() {
     _authSub = _service.authStateChanges().listen((fbUser) {
       _profileSub?.cancel();
+
       if (fbUser == null) {
         _user = null;
         _status = AuthStatus.unauthenticated;
         notifyListeners();
         return;
       }
-      // Wait for the Firestore profile (it holds the role)
-      _profileSub = _service.watchProfile(fbUser.uid).listen((profile) {
+
+      // Listen to Firestore profile changes
+      _profileSub = _service.watchProfile(fbUser.uid).listen((profile) async {
+        if (profile != null && !profile.isActive) {
+          // Account is disabled by admin: force sign out
+          _user = null;
+          _status = AuthStatus.unauthenticated;
+          _error = 'Ce compte a été désactivé.';
+          notifyListeners();
+          await _service.signOut();
+          return;
+        }
+
         _user = profile;
         _status = profile == null
             ? AuthStatus.checking

@@ -7,6 +7,7 @@ class AppUser {
   final String name;
   final String email;
   final UserRole role;
+  final bool isActive;
   final DateTime? createdAt;
 
   const AppUser({
@@ -14,6 +15,7 @@ class AppUser {
     required this.name,
     required this.email,
     required this.role,
+    this.isActive = true,
     this.createdAt,
   });
 
@@ -22,11 +24,11 @@ class AppUser {
       uid: uid,
       name: map['name'] as String? ?? '',
       email: map['email'] as String? ?? '',
-      // Unknown value -> least privileged role
       role: UserRole.values.firstWhere(
         (r) => r.name == map['role'],
         orElse: () => UserRole.student,
       ),
+      isActive: map['active'] as bool? ?? true,
       createdAt: (map['createdAt'] as Timestamp?)?.toDate(),
     );
   }
@@ -35,6 +37,7 @@ class AppUser {
         'name': name,
         'email': email,
         'role': role.name,
+        'active': isActive,
         'createdAt': FieldValue.serverTimestamp(),
       };
 }
