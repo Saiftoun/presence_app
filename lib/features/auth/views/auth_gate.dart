@@ -5,6 +5,7 @@ import '../controllers/auth_controller.dart';
 import '../models/app_user.dart';
 import 'login_view.dart';
 import 'splash_view.dart';
+import '../../teacher/views/teacher_home_view.dart';
 import '../../admin/views/admin_home_view.dart';
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
@@ -21,8 +22,8 @@ class AuthGate extends StatelessWidget {
         switch (auth.user!.role) {
        case UserRole.admin:
             return const AdminHomeView();
-          case UserRole.teacher:
-            return const RoleHomeView(title: 'Espace Enseignant');
+       case UserRole.teacher:
+            return const TeacherHomeView();
           case UserRole.student:
             return const RoleHomeView(title: 'Espace Étudiant');
         }
