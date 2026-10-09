@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../auth/controllers/auth_controller.dart';
+import '../../auth/models/app_user.dart';
 
 class RoleHomeView extends StatelessWidget {
   final String title;
-  const RoleHomeView({super.key, required this.title});
+  final AppUser user;
+
+  const RoleHomeView({super.key, required this.title, required this.user});
 
   @override
   Widget build(BuildContext context) {
-    final user = context.watch<AuthController>().user!;
     return Scaffold(
       appBar: AppBar(
         title: Text(title),
@@ -21,9 +23,11 @@ class RoleHomeView extends StatelessWidget {
         ],
       ),
       body: Center(
-        child: Text('Bonjour ${user.name}\nRôle : ${user.role.name}',
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.titleLarge),
+        child: Text(
+          'Bonjour ${user.name}\nRôle : ${user.role.name}',
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
       ),
     );
   }
