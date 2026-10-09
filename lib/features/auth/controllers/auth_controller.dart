@@ -3,12 +3,15 @@ import 'package:flutter/foundation.dart';
 import '../models/app_user.dart';
 import '../services/auth_service.dart';
 
-enum AuthStatus { checking, unauthenticated, authenticated }
+enum AuthStatus { checking, unauthenticated, authenticated, profileError }
 
 class AuthController extends ChangeNotifier {
+  static const _profileLoadTimeout = Duration(seconds: 15);
+
   final AuthService _service;
   StreamSubscription? _authSub;
   StreamSubscription? _profileSub;
+  Timer? _profileTimeout;
 
   AuthStatus _status = AuthStatus.checking;
   AppUser? _user;
@@ -25,35 +28,83 @@ class AuthController extends ChangeNotifier {
   String? get error => _error;
 
   void _listen() {
-    _authSub = _service.authStateChanges().listen((fbUser) {
-      _profileSub?.cancel();
+    _authSub = _service.authStateChanges().listen(
+      (fbUser) {
+        _profileSub?.cancel();
+        _profileTimeout?.cancel();
 
-      if (fbUser == null) {
-        _user = null;
-        _status = AuthStatus.unauthenticated;
-        notifyListeners();
-        return;
-      }
-
-      // Listen to Firestore profile changes
-      _profileSub = _service.watchProfile(fbUser.uid).listen((profile) async {
-        if (profile != null && !profile.isActive) {
-          // Account is disabled by admin: force sign out
+        if (fbUser == null) {
           _user = null;
           _status = AuthStatus.unauthenticated;
-          _error = 'Ce compte a été désactivé.';
+          _error = null;
           notifyListeners();
-          await _service.signOut();
           return;
         }
 
-        _user = profile;
-        _status = profile == null
-            ? AuthStatus.checking
-            : AuthStatus.authenticated;
+        _user = null;
+        _status = AuthStatus.checking;
+        _error = null;
         notifyListeners();
-      });
-    });
+
+        // Do not leave a signed-in account on the splash screen forever if
+        // its Firestore role profile is missing or cannot be read.
+        _profileTimeout = Timer(_profileLoadTimeout, () {
+          if (_status == AuthStatus.checking && _user == null) {
+            _status = AuthStatus.profileError;
+            _error = 'Profil introuvable. Demandez à un administrateur de vérifier votre compte.';
+            notifyListeners();
+          }
+        });
+
+        _profileSub = _service.watchProfile(fbUser.uid).listen(
+          (profile) async {
+            if (profile == null) {
+              _user = null;
+              _status = AuthStatus.checking;
+              notifyListeners();
+              return;
+            }
+
+            _profileTimeout?.cancel();
+            if (!profile.isActive) {
+              _user = null;
+              _status = AuthStatus.unauthenticated;
+              _error = 'Ce compte a été désactivé.';
+              notifyListeners();
+              await _service.signOut();
+              return;
+            }
+
+            if (profile.role == UserRole.unknown) {
+              _user = null;
+              _status = AuthStatus.profileError;
+              _error = 'Rôle utilisateur invalide. Contactez un administrateur.';
+              notifyListeners();
+              return;
+            }
+
+            _user = profile;
+            _status = AuthStatus.authenticated;
+            _error = null;
+            notifyListeners();
+          },
+          onError: (Object _) {
+            _profileTimeout?.cancel();
+            _user = null;
+            _status = AuthStatus.profileError;
+            _error = 'Impossible de charger votre profil. Vérifiez la connexion ou contactez un administrateur.';
+            notifyListeners();
+          },
+        );
+      },
+      onError: (Object _) {
+        _profileTimeout?.cancel();
+        _user = null;
+        _status = AuthStatus.profileError;
+        _error = 'Impossible de vérifier votre session. Réessayez.';
+        notifyListeners();
+      },
+    );
   }
 
   Future<bool> signIn(String email, String password) =>
@@ -97,6 +148,7 @@ class AuthController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _profileTimeout?.cancel();
     _authSub?.cancel();
     _profileSub?.cancel();
     super.dispose();

@@ -24,35 +24,40 @@ class AuthService {
 
   Future<void> signIn(String email, String password) async {
     try {
-      await _auth.signInWithEmailAndPassword(email: email, password: password);
+      await _auth.signInWithEmailAndPassword(
+        email: email.trim().toLowerCase(),
+        password: password,
+      );
     } on FirebaseAuthException catch (e) {
       throw AuthException(_messageFor(e.code));
     }
   }
 
-  /// Public registration: always creates a STUDENT.
+  /// Public registration always creates a student; teacher/admin roles are
+  /// assigned through the trusted admin flow, never from the registration UI.
   Future<void> registerStudent({
     required String name,
     required String email,
     required String password,
   }) async {
     UserCredential? cred;
+    final normalizedEmail = email.trim().toLowerCase();
     try {
       cred = await _auth.createUserWithEmailAndPassword(
-        email: email,
+        email: normalizedEmail,
         password: password,
       );
       final user = AppUser(
         uid: cred.user!.uid,
-        name: name,
-        email: email,
+        name: name.trim(),
+        email: cred.user?.email ?? normalizedEmail,
         role: UserRole.student,
       );
       await _db.collection('users').doc(user.uid).set(user.toMap());
     } on FirebaseAuthException catch (e) {
       throw AuthException(_messageFor(e.code));
     } catch (_) {
-      // Profile write failed: don't leave an orphan auth account
+      // Profile write failed: don't leave an orphan auth account.
       await cred?.user?.delete();
       throw const AuthException('Inscription impossible. Réessayez.');
     }
@@ -60,7 +65,7 @@ class AuthService {
 
   Future<void> sendPasswordReset(String email) async {
     try {
-      await _auth.sendPasswordResetEmail(email: email);
+      await _auth.sendPasswordResetEmail(email: email.trim().toLowerCase());
     } on FirebaseAuthException catch (e) {
       throw AuthException(_messageFor(e.code));
     }

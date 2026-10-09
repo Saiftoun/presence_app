@@ -1,0 +1,59 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return signedIn()
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.active != false;
+    }
+
+    function validStudentProfile() {
+      return request.resource.data.keys().hasAll(['name', 'email', 'role', 'active', 'createdAt'])
+        && request.resource.data.keys().hasOnly(['name', 'email', 'role', 'active', 'createdAt'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 3
+        && request.resource.data.email is string
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.role == 'student'
+        && request.resource.data.active == true
+        && request.resource.data.createdAt == request.time;
+    }
+
+    match /users/{userId} {
+      allow get: if isSelf(userId) || isAdmin();
+      allow list: if isAdmin();
+
+      // Public signup can create student profiles only. Teacher profiles are
+      // created by the Admin SDK callable and cannot be self-assigned.
+      allow create: if isSelf(userId) && validStudentProfile();
+
+      // Users can edit their own name; admins can manage teacher/student names
+      // and active status but cannot promote anyone to admin.
+      allow update: if isSelf(userId)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name'])
+          && request.resource.data.name is string
+          && request.resource.data.name.size() >= 3
+        || isAdmin()
+          && resource.data.role in ['teacher', 'student']
+          && request.resource.data.role == resource.data.role
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'active']);
+
+      // Account deletion must go through a trusted Admin SDK flow so the Auth
+      // account and profile cannot be left out of sync.
+      allow delete: if false;
+    }
+
+    // Other collections stay closed until their feature-specific rules exist.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
