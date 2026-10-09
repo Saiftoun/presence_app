@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/app_message_banner.dart';
 import '../controllers/teacher_controller.dart';
 
 class AddTeacherView extends StatefulWidget {
@@ -14,12 +16,14 @@ class _AddTeacherViewState extends State<AddTeacherView> {
   final _nameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
+  bool _passwordObscure = true;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback(
-        (_) => context.read<TeacherController>().clearError());
+      (_) => context.read<TeacherController>().clearError(),
+    );
   }
 
   @override
@@ -32,14 +36,14 @@ class _AddTeacherViewState extends State<AddTeacherView> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    final ok = await context.read<TeacherController>().createTeacher(
+    final created = await context.read<TeacherController>().createTeacher(
           _nameCtrl.text.trim(),
           _emailCtrl.text.trim(),
           _passwordCtrl.text,
         );
-    if (ok && mounted) {
+    if (created && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enseignant créé.')),
+        const SnackBar(content: Text('Le compte enseignant a été créé.')),
       );
       Navigator.of(context).pop();
     }
@@ -47,7 +51,7 @@ class _AddTeacherViewState extends State<AddTeacherView> {
 
   @override
   Widget build(BuildContext context) {
-    final ctrl = context.watch<TeacherController>();
+    final controller = context.watch<TeacherController>();
     final theme = Theme.of(context);
 
     return Scaffold(
@@ -55,65 +59,123 @@ class _AddTeacherViewState extends State<AddTeacherView> {
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Form(
-                key: _formKey,
+              constraints: const BoxConstraints(maxWidth: 620),
+              child: Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: AppColors.outline),
+                ),
                 child: Column(
-                  mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    TextFormField(
-                      controller: _nameCtrl,
-                      textCapitalization: TextCapitalization.words,
-                      decoration: const InputDecoration(
-                        labelText: 'Nom complet',
-                        prefixIcon: Icon(Icons.person_outline),
+                    Container(
+                      width: 52,
+                      height: 52,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: AppColors.teal.withAlpha(24),
+                        borderRadius: BorderRadius.circular(17),
                       ),
-                      validator: (v) => (v == null || v.trim().length < 3)
-                          ? 'Nom trop court'
-                          : null,
+                      child: const Icon(Icons.person_add_alt_1_rounded, color: AppColors.teal, size: 26),
                     ),
                     const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _emailCtrl,
-                      keyboardType: TextInputType.emailAddress,
-                      decoration: const InputDecoration(
-                        labelText: 'Email',
-                        prefixIcon: Icon(Icons.email_outlined),
+                    Text(
+                      'Créer un accès enseignant',
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.ink,
                       ),
-                      validator: (v) => (v == null || !v.contains('@'))
-                          ? 'Email invalide'
-                          : null,
                     ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _passwordCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Mot de passe temporaire',
-                        prefixIcon: Icon(Icons.lock_outline),
+                    const SizedBox(height: 7),
+                    Text(
+                      'Renseignez les informations du compte. L’enseignant pourra ensuite se connecter avec ces identifiants.',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: AppColors.mutedInk,
+                        height: 1.45,
                       ),
-                      validator: (v) => (v == null || v.length < 6)
-                          ? '6 caractères minimum'
-                          : null,
                     ),
-                    const SizedBox(height: 24),
-                    if (ctrl.error != null)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: Text(ctrl.error!,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: theme.colorScheme.error)),
+                    const SizedBox(height: 20),
+                    const AppMessageBanner(
+                      message: 'Les comptes enseignants sont créés par un administrateur. Le rôle ne peut pas être choisi lors de l’inscription publique.',
+                    ),
+                    const SizedBox(height: 22),
+                    Form(
+                      key: _formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          TextFormField(
+                            controller: _nameCtrl,
+                            textCapitalization: TextCapitalization.words,
+                            textInputAction: TextInputAction.next,
+                            autofillHints: const [AutofillHints.name],
+                            decoration: const InputDecoration(
+                              labelText: 'Nom complet',
+                              prefixIcon: Icon(Icons.person_outline_rounded),
+                            ),
+                            validator: (value) => value == null || value.trim().length < 3
+                                ? 'Saisissez au moins 3 caractères'
+                                : null,
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _emailCtrl,
+                            keyboardType: TextInputType.emailAddress,
+                            textInputAction: TextInputAction.next,
+                            autofillHints: const [AutofillHints.newUsername],
+                            decoration: const InputDecoration(
+                              labelText: 'Adresse e-mail',
+                              prefixIcon: Icon(Icons.alternate_email_rounded),
+                            ),
+                            validator: (value) {
+                              final email = value?.trim() ?? '';
+                              if (email.isEmpty || !email.contains('@') || !email.split('@').last.contains('.')) {
+                                return 'Saisissez une adresse e-mail valide';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _passwordCtrl,
+                            obscureText: _passwordObscure,
+                            textInputAction: TextInputAction.done,
+                            autofillHints: const [AutofillHints.newPassword],
+                            decoration: InputDecoration(
+                              labelText: 'Mot de passe provisoire',
+                              helperText: '6 caractères minimum',
+                              prefixIcon: const Icon(Icons.lock_outline_rounded),
+                              suffixIcon: IconButton(
+                                tooltip: _passwordObscure ? 'Afficher le mot de passe' : 'Masquer le mot de passe',
+                                icon: Icon(_passwordObscure ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+                                onPressed: () => setState(() => _passwordObscure = !_passwordObscure),
+                              ),
+                            ),
+                            validator: (value) => value == null || value.length < 6
+                                ? 'Utilisez au moins 6 caractères'
+                                : null,
+                          ),
+                          if (controller.error != null) ...[
+                            const SizedBox(height: 16),
+                            AppMessageBanner(message: controller.error!, isError: true),
+                          ],
+                          const SizedBox(height: 22),
+                          FilledButton(
+                            onPressed: controller.isSaving ? null : _submit,
+                            child: controller.isSaving
+                                ? const SizedBox(
+                                    width: 22,
+                                    height: 22,
+                                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                  )
+                                : const Text('Créer le compte enseignant'),
+                          ),
+                        ],
                       ),
-                    FilledButton(
-                      onPressed: ctrl.isSaving ? null : _submit,
-                      child: ctrl.isSaving
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2))
-                          : const Text('Créer le compte'),
                     ),
                   ],
                 ),

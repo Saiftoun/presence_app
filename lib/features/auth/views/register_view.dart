@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../core/widgets/app_message_banner.dart';
 import '../controllers/auth_controller.dart';
+import 'auth_ui.dart';
 
 class RegisterView extends StatefulWidget {
   const RegisterView({super.key});
@@ -15,6 +17,8 @@ class _RegisterViewState extends State<RegisterView> {
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
+  bool _passwordObscure = true;
+  bool _confirmObscure = true;
 
   @override
   void dispose() {
@@ -32,7 +36,6 @@ class _RegisterViewState extends State<RegisterView> {
           _emailCtrl.text.trim(),
           _passwordCtrl.text,
         );
-    // AuthGate swaps to the home screen; remove this page from the stack.
     if (ok && mounted) {
       Navigator.of(context).popUntil((route) => route.isFirst);
     }
@@ -41,92 +44,119 @@ class _RegisterViewState extends State<RegisterView> {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthController>();
-    final theme = Theme.of(context);
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Inscription étudiant')),
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    TextFormField(
-                      controller: _nameCtrl,
-                      textCapitalization: TextCapitalization.words,
-                      decoration: const InputDecoration(
-                        labelText: 'Nom complet',
-                        prefixIcon: Icon(Icons.person_outline),
-                      ),
-                      validator: (v) => (v == null || v.trim().length < 3)
-                          ? 'Nom trop court'
-                          : null,
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _emailCtrl,
-                      keyboardType: TextInputType.emailAddress,
-                      decoration: const InputDecoration(
-                        labelText: 'Email',
-                        prefixIcon: Icon(Icons.email_outlined),
-                      ),
-                      validator: (v) =>
-                          (v == null || !v.contains('@')) ? 'Email invalide' : null,
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _passwordCtrl,
-                      obscureText: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Mot de passe',
-                        prefixIcon: Icon(Icons.lock_outline),
-                      ),
-                      validator: (v) => (v == null || v.length < 6)
-                          ? '6 caractères minimum'
-                          : null,
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _confirmCtrl,
-                      obscureText: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Confirmer le mot de passe',
-                        prefixIcon: Icon(Icons.lock_outline),
-                      ),
-                      validator: (v) => v != _passwordCtrl.text
-                          ? 'Les mots de passe ne correspondent pas'
-                          : null,
-                    ),
-                    const SizedBox(height: 24),
-                    if (auth.error != null)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: Text(auth.error!,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: theme.colorScheme.error)),
-                      ),
-                    FilledButton(
-                      onPressed: auth.isLoading ? null : _submit,
-                      child: auth.isLoading
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child:
-                                  CircularProgressIndicator(strokeWidth: 2))
-                          : const Text('Créer mon compte'),
-                    ),
-                  ],
+    return AuthShell(
+      title: 'Créer un compte',
+      subtitle: 'Inscrivez-vous pour accéder à votre espace étudiant.',
+      form: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const AppMessageBanner(
+              message: 'Les inscriptions publiques sont réservées aux étudiants. Les comptes enseignants sont créés par l’administration.',
+            ),
+            const SizedBox(height: 18),
+            TextFormField(
+              controller: _nameCtrl,
+              textCapitalization: TextCapitalization.words,
+              textInputAction: TextInputAction.next,
+              autofillHints: const [AutofillHints.name],
+              decoration: const InputDecoration(
+                labelText: 'Nom complet',
+                prefixIcon: Icon(Icons.person_outline_rounded),
+              ),
+              validator: (value) => value == null || value.trim().length < 3
+                  ? 'Saisissez au moins 3 caractères'
+                  : null,
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _emailCtrl,
+              keyboardType: TextInputType.emailAddress,
+              textInputAction: TextInputAction.next,
+              autofillHints: const [AutofillHints.newUsername],
+              decoration: const InputDecoration(
+                labelText: 'Adresse e-mail',
+                prefixIcon: Icon(Icons.alternate_email_rounded),
+              ),
+              validator: (value) {
+                final email = value?.trim() ?? '';
+                if (email.isEmpty || !email.contains('@') || !email.split('@').last.contains('.')) {
+                  return 'Saisissez une adresse e-mail valide';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _passwordCtrl,
+              obscureText: _passwordObscure,
+              textInputAction: TextInputAction.next,
+              autofillHints: const [AutofillHints.newPassword],
+              decoration: InputDecoration(
+                labelText: 'Mot de passe',
+                helperText: '6 caractères minimum',
+                prefixIcon: const Icon(Icons.lock_outline_rounded),
+                suffixIcon: IconButton(
+                  tooltip: _passwordObscure ? 'Afficher le mot de passe' : 'Masquer le mot de passe',
+                  icon: Icon(_passwordObscure ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+                  onPressed: () => setState(() => _passwordObscure = !_passwordObscure),
                 ),
               ),
+              validator: (value) => value == null || value.length < 6
+                  ? 'Utilisez au moins 6 caractères'
+                  : null,
             ),
-          ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _confirmCtrl,
+              obscureText: _confirmObscure,
+              textInputAction: TextInputAction.done,
+              onFieldSubmitted: (_) => _submit(),
+              decoration: InputDecoration(
+                labelText: 'Confirmer le mot de passe',
+                prefixIcon: const Icon(Icons.lock_reset_rounded),
+                suffixIcon: IconButton(
+                  tooltip: _confirmObscure ? 'Afficher le mot de passe' : 'Masquer le mot de passe',
+                  icon: Icon(_confirmObscure ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+                  onPressed: () => setState(() => _confirmObscure = !_confirmObscure),
+                ),
+              ),
+              validator: (value) => value != _passwordCtrl.text
+                  ? 'Les mots de passe ne correspondent pas'
+                  : null,
+            ),
+            if (auth.error != null) ...[
+              const SizedBox(height: 16),
+              AppMessageBanner(message: auth.error!, isError: true),
+            ],
+            const SizedBox(height: 22),
+            FilledButton(
+              onPressed: auth.isLoading ? null : _submit,
+              child: auth.isLoading
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Text('Créer mon compte étudiant'),
+            ),
+          ],
         ),
+      ),
+      footer: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Flexible(child: Text('Vous avez déjà un compte ?')),
+          TextButton(
+            onPressed: auth.isLoading ? null : () => Navigator.of(context).maybePop(),
+            child: const Text('Se connecter'),
+          ),
+        ],
       ),
     );
   }

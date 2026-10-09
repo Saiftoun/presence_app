@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../auth/controllers/auth_controller.dart';
 import '../controllers/teacher_controller.dart';
 import '../services/teacher_service.dart';
@@ -11,37 +12,53 @@ class AdminHomeView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Scoped provider: only created when the admin is logged in
     return ChangeNotifierProvider(
       create: (_) => TeacherController(TeacherService()),
-      child: Builder(builder: (context) {
-        return Scaffold(
+      child: Builder(
+        builder: (context) => Scaffold(
           appBar: AppBar(
-            title: const Text('Enseignants'),
+            title: Row(
+              children: [
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: AppColors.navy,
+                    borderRadius: BorderRadius.circular(11),
+                  ),
+                  child: const Icon(Icons.fact_check_rounded, size: 19, color: Colors.white),
+                ),
+                const SizedBox(width: 11),
+                const Text('Présence'),
+              ],
+            ),
             actions: [
               IconButton(
                 tooltip: 'Se déconnecter',
-                icon: const Icon(Icons.logout),
+                icon: const Icon(Icons.logout_rounded),
                 onPressed: () => context.read<AuthController>().signOut(),
               ),
+              const SizedBox(width: 8),
             ],
           ),
           body: const TeachersListView(),
           floatingActionButton: FloatingActionButton.extended(
-            icon: const Icon(Icons.person_add_alt_1),
+            icon: const Icon(Icons.person_add_alt_1_rounded),
             label: const Text('Ajouter'),
             onPressed: () {
-              final ctrl = context.read<TeacherController>();
-              Navigator.of(context).push(MaterialPageRoute(
-                builder: (_) => ChangeNotifierProvider.value(
-                  value: ctrl,
-                  child: const AddTeacherView(),
+              final controller = context.read<TeacherController>();
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => ChangeNotifierProvider.value(
+                    value: controller,
+                    child: const AddTeacherView(),
+                  ),
                 ),
-              ));
+              );
             },
           ),
-        );
-      }),
+        ),
+      ),
     );
   }
 }

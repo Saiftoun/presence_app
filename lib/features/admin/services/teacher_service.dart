@@ -49,7 +49,7 @@ class TeacherService {
       case 'already-exists':
         return 'Cet email est déjà utilisé.';
       case 'invalid-argument':
-        return 'Vérifiez le nom, l'email et le mot de passe.';
+        return 'Vérifiez les informations saisies et réessayez.';
       case 'unauthenticated':
         return 'Reconnectez-vous pour continuer.';
       case 'permission-denied':
