@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/app_message_banner.dart';
 import '../../admin/views/admin_home_view.dart';
 import '../../home/views/role_home_view.dart';
 import '../controllers/auth_controller.dart';
@@ -54,22 +56,44 @@ class AccountProfileErrorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.account_circle_outlined, size: 48),
-              const SizedBox(height: 16),
-              Text(message, textAlign: TextAlign.center),
-              const SizedBox(height: 16),
-              FilledButton(
-                onPressed: () => context.read<AuthController>().signOut(),
-                child: const Text('Se déconnecter'),
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: AppColors.outline),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Icon(Icons.account_circle_outlined, size: 48, color: AppColors.navy),
+                    const SizedBox(height: 14),
+                    Text(
+                      'Accès au compte',
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+                    ),
+                    const SizedBox(height: 16),
+                    AppMessageBanner(message: message, isError: true),
+                    const SizedBox(height: 18),
+                    FilledButton.icon(
+                      onPressed: () => context.read<AuthController>().signOut(),
+                      icon: const Icon(Icons.logout_rounded),
+                      label: const Text('Se déconnecter'),
+                    ),
+                  ],
+                ),
               ),
-            ],
+            ),
           ),
         ),
       ),
