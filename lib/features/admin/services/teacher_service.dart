@@ -1,11 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
+import '../../../firebase_options.dart';
 import '../../auth/models/app_user.dart';
 import '../../auth/services/auth_service.dart';
 
 class TeacherService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
-  final FirebaseFunctions _functions = FirebaseFunctions.instance;
 
   Stream<List<AppUser>> watchTeachers() {
     return _db
@@ -18,25 +19,59 @@ class TeacherService {
           ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase())));
   }
 
-  /// Creates a teacher account on the trusted server. The callable verifies
-  /// the current user's admin role before creating Firebase Auth and Firestore
-  /// records, so the admin's session is never replaced by the new account.
   Future<void> createTeacher({
     required String name,
     required String email,
     required String password,
   }) async {
+    final appName = 'teacher-creation-${DateTime.now().microsecondsSinceEpoch}';
+    FirebaseApp? secondaryApp;
+    FirebaseAuth? secondaryAuth;
+    User? createdUser;
+    var profileCreated = false;
+    final normalizedEmail = email.trim().toLowerCase();
     try {
-      await _functions.httpsCallable('createManagedUser').call({
+      secondaryApp = await Firebase.initializeApp(
+        name: appName,
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+      secondaryAuth = FirebaseAuth.instanceFor(app: secondaryApp);
+      final credential = await secondaryAuth.createUserWithEmailAndPassword(
+        email: normalizedEmail,
+        password: password,
+      );
+      createdUser = credential.user;
+      if (createdUser == null) {
+        throw const AuthException('Compte enseignant impossible à créer.');
+      }
+
+      await _db.collection('users').doc(createdUser.uid).set({
         'name': name.trim(),
-        'email': email.trim().toLowerCase(),
-        'password': password,
+        'email': normalizedEmail,
         'role': 'teacher',
+        'active': true,
+        'createdAt': FieldValue.serverTimestamp(),
       });
-    } on FirebaseFunctionsException catch (e) {
+      profileCreated = true;
+    } on FirebaseAuthException catch (e) {
       throw AuthException(_messageFor(e.code));
-    } catch (_) {
+    } on FirebaseException catch (e) {
+      if (e.code == 'permission-denied') {
+        throw const AuthException(
+          'Cette action est réservée à un administrateur.',
+        );
+      }
       throw const AuthException('Création impossible. Réessayez.');
+    } finally {
+      if (!profileCreated && createdUser != null && secondaryAuth != null) {
+        try {
+          await createdUser.delete();
+        } catch (_) {
+          // Keep the original failure; the account can be reconciled manually.
+        }
+      }
+      await secondaryAuth?.signOut();
+      await secondaryApp?.delete();
     }
   }
 
@@ -46,16 +81,14 @@ class TeacherService {
 
   String _messageFor(String code) {
     switch (code) {
-      case 'already-exists':
-        return 'Cet email est déjà utilisé.';
-      case 'invalid-argument':
-        return 'Vérifiez les informations saisies et réessayez.';
-      case 'unauthenticated':
-        return 'Reconnectez-vous pour continuer.';
-      case 'permission-denied':
-        return 'Cette action est réservée à un administrateur.';
-      case 'unavailable':
-        return 'Service indisponible. Réessayez plus tard.';
+      case 'email-already-in-use':
+        return 'Cet e-mail est déjà utilisé.';
+      case 'invalid-email':
+        return 'Adresse e-mail invalide.';
+      case 'weak-password':
+        return 'Mot de passe trop faible (6 caractères minimum).';
+      case 'network-request-failed':
+        return 'Problème de connexion internet.';
       default:
         return 'Création impossible. Réessayez.';
     }

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import '../../auth/models/app_user.dart';
 import '../../auth/services/auth_service.dart';
@@ -6,7 +7,7 @@ import '../services/teacher_service.dart';
 
 class TeacherController extends ChangeNotifier {
   final TeacherService _service;
-  StreamSubscription? _sub;
+  StreamSubscription? _teachersSub;
 
   List<AppUser> _teachers = [];
   bool _loading = true;
@@ -14,10 +15,10 @@ class TeacherController extends ChangeNotifier {
   String? _error;
 
   TeacherController(this._service) {
-    _sub = _service.watchTeachers().listen(
+    _teachersSub = _service.watchTeachers().listen(
       (list) {
         _teachers = list;
-        _loading = false;
+        _updateLoadingState();
         notifyListeners();
       },
       onError: (_) {
@@ -33,15 +34,28 @@ class TeacherController extends ChangeNotifier {
   bool get isSaving => _saving;
   String? get error => _error;
 
-  Future<bool> createTeacher(String name, String email, String password) async {
+  Future<bool> createTeacher({
+    required String name,
+    required String email,
+    required String password,
+  }) async {
     _saving = true;
     _error = null;
     notifyListeners();
     try {
-      await _service.createTeacher(name: name, email: email, password: password);
+      await _service.createTeacher(
+        name: name,
+        email: email,
+        password: password,
+      );
       return true;
     } on AuthException catch (e) {
       _error = e.message;
+      return false;
+    } on FirebaseException catch (e) {
+      _error = e.code == 'permission-denied'
+          ? 'Cette action est réservée à un administrateur.'
+          : 'Promotion impossible. Réessayez.';
       return false;
     } finally {
       _saving = false;
@@ -63,9 +77,18 @@ class TeacherController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void showError(String message) {
+    _error = message;
+    notifyListeners();
+  }
+
   @override
   void dispose() {
-    _sub?.cancel();
+    _teachersSub?.cancel();
     super.dispose();
+  }
+
+  void _updateLoadingState() {
+    _loading = false;
   }
 }

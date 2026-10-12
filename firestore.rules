@@ -12,7 +12,10 @@ service cloud.firestore {
     function isAdmin() {
       return signedIn()
         && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.active != false;
+        && (
+          !get(/databases/$(database)/documents/users/$(request.auth.uid)).data.keys().hasAny(['active'])
+          || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.active == true
+        );
     }
 
     function validStudentProfile() {
@@ -31,20 +34,31 @@ service cloud.firestore {
       allow get: if isSelf(userId) || isAdmin();
       allow list: if isAdmin();
 
-      // Public signup can create student profiles only. Teacher profiles are
-      // created by the Admin SDK callable and cannot be self-assigned.
-      allow create: if isSelf(userId) && validStudentProfile();
+      // Public signup can create student profiles only.
+      allow create: if isSelf(userId) && validStudentProfile()
+        || isAdmin()
+          && request.resource.data.keys().hasOnly(['name', 'email', 'role', 'active', 'createdAt'])
+          && request.resource.data.name is string
+          && request.resource.data.name.size() >= 3
+          && request.resource.data.email is string
+          && request.resource.data.role == 'teacher'
+          && request.resource.data.active == true
+          && request.resource.data.createdAt == request.time;
 
-      // Users can edit their own name; admins can manage teacher/student names
-      // and active status but cannot promote anyone to admin.
+      // Users can edit their own name. Admins can manage names and active
+      // status, and can promote an existing student to teacher.
       allow update: if isSelf(userId)
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name'])
           && request.resource.data.name is string
           && request.resource.data.name.size() >= 3
         || isAdmin()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'active'])
           && resource.data.role in ['teacher', 'student']
           && request.resource.data.role == resource.data.role
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'active']);
+        || isAdmin()
+          && resource.data.role == 'student'
+          && request.resource.data.role == 'teacher'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role']);
 
       // Account deletion must go through a trusted Admin SDK flow so the Auth
       // account and profile cannot be left out of sync.

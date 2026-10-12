@@ -74,7 +74,7 @@ class _TeachersListViewState extends State<TeachersListView> {
             ),
             const SizedBox(height: 7),
             Text(
-              'Créez les accès et gérez les comptes de votre équipe.',
+              'Ajoutez un étudiant existant à votre équipe et gérez les comptes enseignants.',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: AppColors.mutedInk,
                 height: 1.45,
