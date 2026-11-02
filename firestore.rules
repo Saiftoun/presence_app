@@ -9,13 +9,50 @@ service cloud.firestore {
       return signedIn() && request.auth.uid == userId;
     }
 
-    function isAdmin() {
+    function hasActiveRole(role) {
       return signedIn()
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role
         && (
           !get(/databases/$(database)/documents/users/$(request.auth.uid)).data.keys().hasAny(['active'])
           || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.active == true
         );
+    }
+
+    function isAdmin() {
+      return hasActiveRole('admin');
+    }
+
+    function isActiveTeacher(teacherId) {
+      return exists(/databases/$(database)/documents/users/$(teacherId))
+        && get(/databases/$(database)/documents/users/$(teacherId)).data.role == 'teacher'
+        && (
+          !get(/databases/$(database)/documents/users/$(teacherId)).data.keys().hasAny(['active'])
+          || get(/databases/$(database)/documents/users/$(teacherId)).data.active == true
+        );
+    }
+
+    function validClass(classData) {
+      return classData.keys().hasAll([
+          'name', 'group', 'description', 'teacherId', 'studentIds', 'active', 'createdAt'
+        ])
+        && classData.keys().hasOnly([
+          'name', 'group', 'description', 'teacherId', 'studentIds', 'active', 'createdAt'
+        ])
+        && classData.name is string
+        && classData.name.size() >= 2
+        && classData.name.size() <= 100
+        && classData.group is string
+        && classData.group.size() >= 1
+        && classData.group.size() <= 80
+        && classData.description is string
+        && classData.description.size() <= 1000
+        && classData.teacherId is string
+        && isActiveTeacher(classData.teacherId)
+        && classData.studentIds is list
+        && classData.studentIds.size() <= 500
+        && classData.active is bool
+        && classData.createdAt is timestamp;
     }
 
     function validStudentProfile() {
@@ -34,7 +71,8 @@ service cloud.firestore {
       allow get: if isSelf(userId) || isAdmin();
       allow list: if isAdmin();
 
-      // Public signup can create student profiles only.
+      // Public signup creates student profiles only. Admin-created teacher
+      // profiles are restricted to the teacher role.
       allow create: if isSelf(userId) && validStudentProfile()
         || isAdmin()
           && request.resource.data.keys().hasOnly(['name', 'email', 'role', 'active', 'createdAt'])
@@ -45,8 +83,8 @@ service cloud.firestore {
           && request.resource.data.active == true
           && request.resource.data.createdAt == request.time;
 
-      // Users can edit their own name. Admins can manage names and active
-      // status, and can promote an existing student to teacher.
+      // Users can edit their own name. Admins manage account status and may
+      // promote a student to teacher, but cannot promote anyone to admin.
       allow update: if isSelf(userId)
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name'])
           && request.resource.data.name is string
@@ -60,12 +98,35 @@ service cloud.firestore {
           && request.resource.data.role == 'teacher'
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role']);
 
-      // Account deletion must go through a trusted Admin SDK flow so the Auth
-      // account and profile cannot be left out of sync.
+      // Account deletion must go through a trusted flow so Auth and Firestore
+      // cannot be left out of sync.
       allow delete: if false;
     }
 
-    // Other collections stay closed until their feature-specific rules exist.
+    match /classes/{classId} {
+      // This admin module owns class records. Teacher and student reads are
+      // enabled later with their role-specific screens.
+      allow get, list: if isAdmin();
+
+      allow create: if isAdmin()
+        && validClass(request.resource.data)
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.studentIds.size() == 0;
+
+      allow update: if isAdmin()
+        && validClass(request.resource.data)
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'name', 'group', 'description', 'teacherId', 'studentIds', 'active'
+        ]);
+
+      // Archive instead of deleting so future session and attendance records
+      // can retain their class reference.
+      allow delete: if false;
+    }
+
+    // Sessions, attendance, and other collections stay closed until their
+    // feature-specific rules are implemented.
     match /{document=**} {
       allow read, write: if false;
     }

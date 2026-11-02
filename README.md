@@ -9,7 +9,7 @@ Flutter attendance app using Firebase Authentication and Cloud Firestore.
 - An admin creates teacher accounts from the admin form. The app uses a separate Firebase Auth app instance, so the admin session is preserved; this does not require Cloud Functions or the Blaze plan.
 - Unknown or missing profile roles are not treated as student accounts. Missing profiles show a recoverable error rather than an endless loading screen.
 - Users can change only their own profile name. Firestore rules allow only an active admin to promote a student to teacher; clients cannot assign themselves a role.
-- The current rule file intentionally denies access to collections other than users until those features receive their own rules.
+- Firestore rules protect user profiles and classes. Class writes are admin-only, while teachers and students can read only classes assigned to them. Sessions, attendance, and Storage remain closed until their feature-specific rules are added.
 
 ## First-time Firebase setup
 
@@ -32,3 +32,10 @@ The teacher does not use public student registration. The admin's session remain
 ## Tests
 
 Run flutter test after flutter pub get. Tests cover role decoding, unknown-role handling, role labels, and student/teacher landing screens. Deploy the Firestore rules before testing the admin promotion flow.
+
+
+## Admin class management
+
+The admin area can create, edit, archive, and restore classes. Each class stores a name, group, description, responsible teacher, student IDs, active state, and creation time. Admins can assign active teachers and enroll active students from the class details screen. Classes are archived rather than hard-deleted so later session and attendance records can retain their class reference.
+
+Only admins can read and write class documents in this admin-focused phase. Teacher and student class access will be added with their role-specific flows. Sessions and attendance remain unavailable until their data flows and Firestore rules are added.

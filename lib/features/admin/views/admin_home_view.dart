@@ -2,9 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../auth/controllers/auth_controller.dart';
+import '../controllers/admin_class_controller.dart';
 import '../controllers/teacher_controller.dart';
+import '../services/admin_class_service.dart';
 import '../services/teacher_service.dart';
+import 'add_class_view.dart';
 import 'add_teacher_view.dart';
+import 'admin_classes_view.dart';
 import 'teachers_list_view.dart';
 
 class AdminHomeView extends StatelessWidget {
@@ -12,8 +16,11 @@ class AdminHomeView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => TeacherController(TeacherService()),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => TeacherController(TeacherService())),
+        ChangeNotifierProvider(create: (_) => AdminClassController(AdminClassService())),
+      ],
       child: const _AdminNavigationShell(),
     );
   }
@@ -36,11 +43,7 @@ class _AdminNavigationShellState extends State<_AdminNavigationShell> {
     final pages = <Widget>[
       _AdminOverviewView(onNavigate: (index) => setState(() => _selectedIndex = index)),
       const TeachersListView(),
-      const _AdminPlaceholderView(
-        icon: Icons.class_outlined,
-        title: 'Gestion des classes',
-        description: 'Les classes et leurs groupes apparaîtront ici lorsqu’ils seront configurés.',
-      ),
+      const AdminClassesView(),
       const _AdminPlaceholderView(
         icon: Icons.groups_2_outlined,
         title: 'Gestion des étudiants',
@@ -80,20 +83,32 @@ class _AdminNavigationShellState extends State<_AdminNavigationShell> {
         ],
       ),
       body: IndexedStack(index: _selectedIndex, children: pages),
-      floatingActionButton: _selectedIndex == 1
+      floatingActionButton: (_selectedIndex == 1 || _selectedIndex == 2)
           ? FloatingActionButton.extended(
-              icon: const Icon(Icons.person_add_alt_1_rounded),
+              icon: Icon(_selectedIndex == 1 ? Icons.person_add_alt_1_rounded : Icons.add_rounded),
               label: const Text('Ajouter'),
               onPressed: () {
-                final controller = context.read<TeacherController>();
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => ChangeNotifierProvider.value(
-                      value: controller,
-                      child: const AddTeacherView(),
+                if (_selectedIndex == 1) {
+                  final controller = context.read<TeacherController>();
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => ChangeNotifierProvider.value(
+                        value: controller,
+                        child: const AddTeacherView(),
+                      ),
                     ),
-                  ),
-                );
+                  );
+                } else {
+                  final controller = context.read<AdminClassController>();
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => ChangeNotifierProvider.value(
+                        value: controller,
+                        child: const AddClassView(),
+                      ),
+                    ),
+                  );
+                }
               },
             )
           : null,
